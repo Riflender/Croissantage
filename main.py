@@ -59,13 +59,13 @@ async def embed_stop(victim: discord.Member, people: list[str], author: discord.
     admin = await get_admin()
 
     desc = ""
-    if people[0] == "Personne...":
-        desc = f"Bien joué {victim.mention} ! Tu n'as laissé le temps à personne de te croissanté !\n\n" \
-               f"Tu peux tout de même voir tes dettes avec la commande __**{bot.command_prefix}debts**__"
+    if len(people) == 0 or people[0] == "Personne...":
+        desc = f"Bien joué {victim.mention} ! Tu n'as laissé le temps à personne de te croissanter !\n\n" \
+               f"Tu peux tout de même voir tes dettes avec la commande __**{bot.command_prefix}dettes**__"
     else:
         desc = f"Dommage, dommage {victim.mention}...\n\nTu dois désormais un croissant à ces personnes :\n" + \
                "\n".join(people) + \
-               f"\n\nTu peux voir tes dettes avec la commande __**{bot.command_prefix}debts**__"
+               f"\n\nTu peux voir tes dettes avec la commande __**{bot.command_prefix}dettes**__"
 
     e = discord.Embed(title="Fin du croissantage :kissing_heart:",
                       color=0xffc119,
@@ -198,6 +198,9 @@ async def stop(ctx):
 
         people = []
         for p in get_all_profiteurs(msg.embeds[0].fields):
+            if p == "Personne...":
+                continue
+
             people.append(p)
 
             # Ajoute le profiteur aux dettes de la victime
@@ -224,7 +227,7 @@ async def stop(ctx):
     # Vide la liste des croissantages de l'auteur de la commande
     data[str(ctx.author.id)]["ongoings"] = []
 
-    #Actualise la base de données
+    # Actualise la base de données
     write_json(data)
 
 
@@ -281,4 +284,4 @@ async def source(ctx):
     await ctx.send("Le lien du Github est accessible ici :\nhttps://github.com/Riflender/Croissantage")
 
 
-bot.run("NTU3MzM0MjYxMjY3NDMxNDQw.GX8wtt.9RKK0cX3pV4U-e6N9PnVSidONwKGQYlMc31L9g")
+bot.run("NTU3MzM0MjYxMjY3NDMxNDQw.GGpC0y.miRxzjYB4YkjvhZy7z0bKtpHkagbN-WW7DoU50")
