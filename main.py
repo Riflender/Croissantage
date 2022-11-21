@@ -39,7 +39,7 @@ async def embed_croissant(victim: discord.Member, author: discord.Member = None)
 
     e = discord.Embed(title=f"Croissants !!",
                       color=0xffc119,
-                      description=f"{victim.mention} a été croissanté par {author.mention if has_author else ''} !\n\n"
+                      description=f"{victim.mention} a été croissanté{' par ' + author.mention if has_author else ''} !\n\n"
                                   "Si vous voulez qu'il vous offre un croissant, "
                                   "réagissez avec l'emote croissant. :croissant:\n\n"
                                   f"Si tu es la victime, tape la commande : __**{bot.command_prefix}stop**__\n",
@@ -58,12 +58,18 @@ async def embed_croissant(victim: discord.Member, author: discord.Member = None)
 async def embed_stop(victim: discord.Member, people: list[str], author: discord.Member = None) -> discord.Embed:
     admin = await get_admin()
 
-    e = discord.Embed(title="",
+    desc = ""
+    if people[0] == "Personne...":
+        desc = f"Bien joué {victim.mention} ! Tu n'as laissé le temps à personne de te croissanté !\n\n" \
+               f"Tu peux tout de même voir tes dettes avec la commande __**{bot.command_prefix}debts**__"
+    else:
+        desc = f"Dommage, dommage {victim.mention}...\n\nTu dois désormais un croissant à ces personnes :\n" + \
+               "\n".join(people) + \
+               f"\n\nTu peux voir tes dettes avec la commande __**{bot.command_prefix}debts**__"
+
+    e = discord.Embed(title="Fin du croissantage :kissing_heart:",
                       color=0xffc119,
-                      description=f"Dommage, dommage {victim.mention}..."
-                                  "tu dois désormais un croissant à ces personnes :\n"
-                                  "\n".join(people) +
-                                  f"\n\nTu peux voir les dettes avec la commande __**{bot.command_prefix}debts**__"
+                      description=desc
                       )
 
     has_author = author is not None
@@ -205,10 +211,12 @@ async def stop(ctx):
         cheh_msg = await msg.channel.send("Loading...")
 
         # Récupère l'auteur directement depuis le croisantage
-        author = await get_member(msg.embeds[0].description.split(" ")[5][2:-1], msg.guild)
+        author = None
+        if len(msg.embeds[0].description.split("\n")[0].split(" ")) > 5:
+            author = await get_member(msg.embeds[0].description.split(" ")[5], msg.guild)
 
         # Affiche le message par modification
-        await cheh_msg.edit(embed=await embed_stop(ctx.author, people, author))
+        await cheh_msg.edit(content=None, embed=await embed_stop(ctx.author, people, author))
 
         # Supprime le message de croissantage
         await msg.delete()
@@ -273,4 +281,4 @@ async def source(ctx):
     await ctx.send("Le lien du Github est accessible ici :\nhttps://github.com/Riflender/Croissantage")
 
 
-bot.run("NTU3MzM0MjYxMjY3NDMxNDQw.GVhhq0.SL3y6PAFAgra4zMAkapkiwMF20oiL8RLXji3fM")
+bot.run("NTU3MzM0MjYxMjY3NDMxNDQw.GX8wtt.9RKK0cX3pV4U-e6N9PnVSidONwKGQYlMc31L9g")
