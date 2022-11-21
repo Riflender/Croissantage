@@ -8,7 +8,7 @@ from discord.ext.commands import Bot
 
 intents = discord.Intents.default()
 intents.message_content = True
-bot = Bot(command_prefix="&", intents=intents)
+bot = Bot(command_prefix="!", intents=intents)
 
 discord.Embed.add_field = partialmethod(discord.Embed.add_field, inline=False)
 
@@ -35,15 +35,15 @@ async def get_member(info: Union[None, int, str], guild: discord.Guild) -> Optio
 async def embed_croissant(victim: discord.Member, author: discord.Member = None) -> discord.Embed:
     admin = await get_admin()
 
-    e = discord.Embed(title=f"Croissantage !!",
+    has_author = author is not None
+
+    e = discord.Embed(title=f"Croissants !!",
                       color=0xffc119,
-                      description=f"{victim.mention} a été croissanté !\n\n"
+                      description=f"{victim.mention} a été croissanté par {author.mention if has_author else ''} !\n\n"
                                   "Si vous voulez qu'il vous offre un croissant, "
                                   "réagissez avec l'emote croissant. :croissant:\n\n"
                                   f"Si tu es la victime, tape la commande : __**{bot.command_prefix}stop**__\n",
                       )
-
-    has_author = author is not None
 
     if has_author:
         e.set_author(name=f"Auteur : {author}", icon_url=author.avatar.url)
@@ -51,6 +51,26 @@ async def embed_croissant(victim: discord.Member, author: discord.Member = None)
     e.set_footer(text="Bot fait avec amour (et malice) par Rémi ;)", icon_url=admin.avatar.url)
 
     e.add_field(name="Liste des profiteurs", value=f"{author.mention if has_author else 'Personne...'}")
+
+    return e
+
+
+async def embed_stop(victim: discord.Member, people: list[str], author: discord.Member = None) -> discord.Embed:
+    admin = await get_admin()
+
+    e = discord.Embed(title="",
+                      color=0xffc119,
+                      description=f"Dommage, dommage {victim.mention}..."
+                                  "tu dois désormais un croissant à ces personnes :\n"
+                                  "\n".join(people) +
+                                  f"\n\nTu peux voir les dettes avec la commande __**{bot.command_prefix}debts**__"
+                      )
+
+    has_author = author is not None
+    if has_author:
+        e.set_author(name=f"Auteur : {author}", icon_url=author.avatar.url)
+    e.set_thumbnail(url=victim.avatar.url)
+    e.set_footer(text="Bot fait avec amour (et malice) par Rémi ;)", icon_url=admin.avatar.url)
 
     return e
 
@@ -91,7 +111,9 @@ async def on_ready():
     print("--------\n")
 
 
-@bot.command()
+@bot.command(name="croissant",
+             brief="Miam, miam les bons croissants",
+             aliases=["CROISSANT", "c", "C"])
 async def croissant(ctx, author: Union[None, str, int] = None):
     victim = ctx.author
     author = await get_member(author, ctx.guild)
@@ -104,11 +126,13 @@ async def croissant(ctx, author: Union[None, str, int] = None):
     data = read_json()
 
     if str(victim.id) not in data:
-        data[victim.id] = {}
-        data[victim.id]["debts"] = {}
-        data[victim.id]["ongoings"] = []
+        data[str(victim.id)] = {}
+        data[str(victim.id)]["debts"] = {}
+        data[str(victim.id)]["ongoings"] = []
+        data[str(victim.id)]["occurrences"] = 0
 
     data[str(victim.id)]["ongoings"].append(msg_to_dict_id(msg))
+    data[str(victim.id)]["occurrences"] += 1
 
     write_json(data)
 
@@ -151,39 +175,55 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
         await msg.edit(embed=e)
 
 
-@bot.command()
+@bot.command(name="stop",
+             brief="Dommage, dommage...",
+             aliases=["STOP", "s", "S"])
 async def stop(ctx):
     data = read_json()
 
     if str(ctx.author.id) not in data or len(data[str(ctx.author.id)]["ongoings"]) == 0:
         await ctx.send("Tu n'as aucun croissantage en cours rassure toi :D")
+        return
 
+    # Pour chaque croissantage en cours pour la victime...
     for d in data[str(ctx.author.id)]["ongoings"]:
+        # On récupère le message
         msg = await get_message(d["channel"], d["message"])
 
         people = []
         for p in get_all_profiteurs(msg.embeds[0].fields):
             people.append(p)
 
+            # Ajoute le profiteur aux dettes de la victime
             if p[2:-1] not in data[str(ctx.author.id)]["debts"]:
                 data[str(ctx.author.id)]["debts"][p[2:-1]] = 0
 
+            # Ajoute une dette envers le profiteur
             data[str(ctx.author.id)]["debts"][p[2:-1]] += 1
 
+        # Affiche un premier message à éditer pour éviter de mentionner tout le monde
         cheh_msg = await msg.channel.send("Loading...")
-        await cheh_msg.edit(content="Dommage, dommage...\n\nTu dois désormais un croissant à ces personnes :\n" +
-                                    "\n".join(people) +
-                                    f"\n\nTu peux voir les dettes avec la commande __**{bot.command_prefix}debts**__")
 
+        # Récupère l'auteur directement depuis le croisantage
+        author = await get_member(msg.embeds[0].description.split(" ")[5][2:-1], msg.guild)
+
+        # Affiche le message par modification
+        await cheh_msg.edit(embed=await embed_stop(ctx.author, people, author))
+
+        # Supprime le message de croissantage
         await msg.delete()
 
+    # Vide la liste des croissantages de l'auteur de la commande
     data[str(ctx.author.id)]["ongoings"] = []
 
+    #Actualise la base de données
     write_json(data)
 
 
-@bot.command()
-async def debts(ctx, member: Union[None, str, int] = None):
+@bot.command(name="dettes",
+             brief="À qui vous devez des croissants",
+             aliases=["DETTES", "d", "D"])
+async def dettes(ctx, member: Union[None, str, int] = None):
     data = read_json()
 
     member = await get_member(member, ctx.guild)
@@ -228,6 +268,9 @@ async def rembourse(ctx: discord.ext.commands.Context, member: Union[None, str, 
         return
 
 
+@bot.command()
+async def source(ctx):
+    await ctx.send("Le lien du Github est accessible ici :\nhttps://github.com/Riflender/Croissantage")
 
 
-bot.run("NTU3MzM0MjYxMjY3NDMxNDQw.GKcIIu.zJu6UPxXWbFzcae44qt0vRhjyVmQF6PmzW_tK4")
+bot.run("NTU3MzM0MjYxMjY3NDMxNDQw.GVhhq0.SL3y6PAFAgra4zMAkapkiwMF20oiL8RLXji3fM")
